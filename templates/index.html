@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Biblioteca de práctica musical</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+    <div>
+        <h1>Biblioteca de práctica musical</h1>
+        <p>Pasado · Presente · Futuro</p>
+    </div>
+
+    <div class="header-actions">
+        <button id="libraryBtn" type="button">☰ Biblioteca</button>
+        <button id="uploadBtn" type="button">＋ Nueva partitura</button>
+    </div>
+</header>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="flash-stack">
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
+
+<aside id="libraryPanel" class="side-panel">
+    <div class="panel-header">
+        <div>
+            <h2>Ejercicios guardados</h2>
+            <small>{{ scores|length }} partitura(s)</small>
+        </div>
+        <button id="closeLibraryBtn" type="button">×</button>
+    </div>
+
+    <div class="score-list">
+        {% if scores %}
+            {% for score in scores %}
+                <article class="score-item"
+                         data-score-id="{{ score.id }}"
+                         data-score-url="{{ url_for('score_file', score_id=score.id) }}"
+                         data-score-title="{{ score.title }}">
+                    <button class="score-select" type="button">
+                        <span class="score-order">
+                            {{ score.display_order or "Sin clasificación" }}
+                        </span>
+                        <strong>{{ score.title }}</strong>
+                        <small>{{ score.original_filename }}</small>
+                        {% if score.notes %}
+                            <p>{{ score.notes }}</p>
+                        {% endif %}
+                    </button>
+
+                    <form method="post"
+                          action="{{ url_for('delete_score', score_id=score.id) }}"
+                          onsubmit="return confirm('¿Eliminar esta partitura de la biblioteca?');">
+                        <button class="delete-score" type="submit" title="Eliminar">🗑</button>
+                    </form>
+                </article>
+            {% endfor %}
+        {% else %}
+            <div class="empty-library">
+                <div>🎼</div>
+                <p>Aún no hay partituras guardadas.</p>
+            </div>
+        {% endif %}
+    </div>
+</aside>
+
+<div id="panelBackdrop" class="panel-backdrop hidden"></div>
+
+<dialog id="uploadDialog">
+    <form method="post"
+          action="{{ url_for('create_score') }}"
+          enctype="multipart/form-data"
+          class="upload-form">
+        <div class="dialog-header">
+            <div>
+                <h2>Guardar nueva partitura</h2>
+                <p>Quedará disponible en la biblioteca.</p>
+            </div>
+            <button id="closeUploadBtn" type="button">×</button>
+        </div>
+
+        <label>
+            Título
+            <input name="title" type="text"
+                   placeholder="Ej. Cinco dedos, mano derecha">
+        </label>
+
+        <div class="form-grid">
+            <label>
+                Número de lección
+                <input name="lesson_number" type="number" min="0">
+            </label>
+
+            <label>
+                Número de ejercicio
+                <input name="exercise_number" type="number" min="0">
+            </label>
+        </div>
+
+        <label>
+            Observaciones
+            <textarea name="notes" rows="3"
+                      placeholder="Técnica, mano, dificultad o indicaciones..."></textarea>
+        </label>
+
+        <label class="file-drop">
+            <span>Seleccionar MusicXML / MXL</span>
+            <input name="score_file"
+                   type="file"
+                   required
+                   accept=".musicxml,.xml,.mxl">
+        </label>
+
+        <div class="dialog-actions">
+            <button id="cancelUploadBtn" type="button">Cancelar</button>
+            <button class="primary" type="submit">Guardar partitura</button>
+        </div>
+    </form>
+</dialog>
+
+<main>
+    <section id="welcome" class="welcome">
+        <div class="welcome-card">
+            <div class="music-icon">𝄞</div>
+            <h2>Elige una partitura de la biblioteca</h2>
+            <p>
+                También puedes guardar una nueva para utilizarla después
+                sin tener que volver a subirla.
+            </p>
+            <div class="welcome-actions">
+                <button id="welcomeLibraryBtn" type="button">Ver biblioteca</button>
+                <button id="welcomeUploadBtn" class="primary" type="button">
+                    Nueva partitura
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <section id="practiceArea" class="practice-area hidden">
+        <div class="score-meta">
+            <strong id="scoreTitle">Partitura</strong>
+            <span id="progressText">Compás 1 de 1</span>
+        </div>
+
+        <div class="measure-grid">
+            <article class="measure-card past-card">
+                <div class="card-heading">
+                    <span>PASADO</span>
+                    <small id="pastNumber">—</small>
+                </div>
+                <div id="pastScore" class="score-box"></div>
+            </article>
+
+            <article class="measure-card present-card">
+                <div class="card-heading">
+                    <span>PRESENTE</span>
+                    <small id="presentNumber">1</small>
+                </div>
+                <div id="presentScore" class="score-box"></div>
+                <div class="progress-track">
+                    <div id="measureProgress" class="progress-fill"></div>
+                </div>
+            </article>
+
+            <article class="measure-card future-card">
+                <div class="card-heading">
+                    <span>FUTURO</span>
+                    <small id="futureNumber">2</small>
+                </div>
+                <div id="futureScore" class="score-box"></div>
+            </article>
+        </div>
+    </section>
+</main>
+
+<footer id="controls" class="controls hidden">
+    <div class="transport">
+        <button id="firstBtn" type="button">⏮</button>
+        <button id="prevBtn" type="button">◀</button>
+        <button id="playBtn" class="play" type="button">▶</button>
+        <button id="nextBtn" type="button">▶|</button>
+    </div>
+
+    <div class="tempo-control">
+        <label for="tempo">Tempo</label>
+        <input id="tempo" type="range" min="20" max="180" value="60">
+        <output id="tempoValue">60 BPM</output>
+    </div>
+
+    <div class="control-options">
+        <label><input id="loopToggle" type="checkbox"> Repetir</label>
+        <label><input id="countInToggle" type="checkbox" checked> Cuenta previa</label>
+        <label><input id="metronomeToggle" type="checkbox" checked> Metrónomo</label>
+        <label class="volume-control">
+            Volumen
+            <input id="metronomeVolume" type="range"
+                   min="0" max="100" value="18">
+        </label>
+        <button id="fullscreenBtn" type="button">⛶ Pantalla completa</button>
+    </div>
+</footer>
+
+<div id="countIn" class="count-in hidden">4</div>
+<div id="message" class="message hidden"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.7/build/opensheetmusicdisplay.min.js"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+
+{% if request.args.get('score_id') %}
+<script>
+window.addEventListener("DOMContentLoaded", () => {
+    const item = document.querySelector(
+        '[data-score-id="{{ request.args.get("score_id") }}"]'
+    );
+    if (item) item.querySelector(".score-select").click();
+});
+</script>
+{% endif %}
+</body>
+</html>
