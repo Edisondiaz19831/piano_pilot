@@ -48,3 +48,10 @@ Para respaldar toda la biblioteca, copie juntos:
 
 - `instance/biblioteca_musical.db`
 - la carpeta `uploads`
+
+
+## Transiciones fluidas
+
+Esta versión guarda cada compás renderizado en una caché SVG y precarga los
+compases siguientes mientras se reproduce el actual. De esa manera, el
+metrónomo no tiene que esperar a OpenSheetMusicDisplay en cada transición.

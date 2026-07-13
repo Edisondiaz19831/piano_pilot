@@ -17,7 +17,11 @@ const state = {
     loadedInViewers: false,
     timeSignatures: [],
     audioContext: null,
-    scheduledClicks: []
+    scheduledClicks: [],
+    measureCache: new Map(),
+    measureCachePromises: new Map(),
+    cacheRenderQueue: Promise.resolve(),
+    cacheViewerLoaded: false
 };
 
 const baseOptions = {
@@ -43,6 +47,26 @@ const viewers = {
     present: new opensheetmusicdisplay.OpenSheetMusicDisplay("presentScore", baseOptions),
     future: new opensheetmusicdisplay.OpenSheetMusicDisplay("futureScore", baseOptions)
 };
+
+
+const cacheHost = document.createElement("div");
+cacheHost.id = "osmdCacheHost";
+cacheHost.setAttribute("aria-hidden", "true");
+cacheHost.style.position = "fixed";
+cacheHost.style.left = "-100000px";
+cacheHost.style.top = "0";
+cacheHost.style.width = "1400px";
+cacheHost.style.height = "900px";
+cacheHost.style.overflow = "hidden";
+cacheHost.style.pointerEvents = "none";
+cacheHost.style.opacity = "0";
+document.body.appendChild(cacheHost);
+
+const cacheViewer =
+    new opensheetmusicdisplay.OpenSheetMusicDisplay(
+        cacheHost,
+        baseOptions
+    );
 
 function showMessage(text, timeout = 4500) {
     const box = $("#message");
@@ -126,6 +150,10 @@ function parseScore(xmlText) {
     state.totalMeasures = firstPartMeasures.length;
     state.currentIndex = 0;
     state.loadedInViewers = false;
+    state.cacheViewerLoaded = false;
+    state.measureCache.clear();
+    state.measureCachePromises.clear();
+    state.cacheRenderQueue = Promise.resolve();
     state.measureNumbers = [];
     state.timeSignatures = [];
 
@@ -193,79 +221,136 @@ function durationForMeasure(index) {
     return Math.max(250, quarterNotes * (60000 / state.tempo));
 }
 
-async function loadFullScoreInViewers() {
-    if (state.loadedInViewers) return;
 
-    await Promise.all(
-        Object.values(viewers).map(viewer => viewer.load(state.xmlText))
-    );
+async function loadCacheViewer() {
+    if (state.cacheViewerLoaded) return;
 
-    state.loadedInViewers = true;
+    await cacheViewer.load(state.xmlText);
+    state.cacheViewerLoaded = true;
 }
 
 function clearViewer(elementId) {
     const element = document.getElementById(elementId);
     element.innerHTML = "";
+    element.scrollLeft = 0;
 }
 
-async function renderMeasure(viewer, elementId, index) {
+function applyUniformSvgSize(element) {
+    const svg = element.querySelector("svg");
+    if (!svg) return;
+
+    const uniformHeight = 300;
+
+    svg.removeAttribute("width");
+    svg.removeAttribute("height");
+    svg.style.height = `${uniformHeight}px`;
+    svg.style.width = "auto";
+    svg.style.maxWidth = "none";
+    svg.style.maxHeight = "none";
+    svg.style.display = "block";
+    svg.style.flex = "0 0 auto";
+    svg.style.overflow = "visible";
+
+    const osmdPage = svg.parentElement;
+    if (osmdPage) {
+        osmdPage.style.width = "max-content";
+        osmdPage.style.minWidth = "100%";
+        osmdPage.style.display = "flex";
+        osmdPage.style.alignItems = "center";
+        osmdPage.style.justifyContent = "center";
+    }
+
+    element.scrollLeft = 0;
+}
+
+async function buildMeasureCache(index) {
+    if (index < 0 || index >= state.totalMeasures) {
+        return null;
+    }
+
+    if (state.measureCache.has(index)) {
+        return state.measureCache.get(index);
+    }
+
+    if (state.measureCachePromises.has(index)) {
+        return state.measureCachePromises.get(index);
+    }
+
+    const promise = state.cacheRenderQueue.then(async () => {
+        await loadCacheViewer();
+
+        const number = osmdMeasureNumber(index);
+
+        cacheViewer.setOptions({
+            drawFromMeasureNumber: number,
+            drawUpToMeasureNumber: number,
+            drawMeasureNumbers: false,
+            drawTitle: false,
+            drawSubtitle: false,
+            drawComposer: false,
+            drawLyricist: false,
+            drawCredits: false,
+            drawPartNames: false,
+            newSystemFromXML: false,
+            newPageFromXML: false,
+            pageFormat: "Endless",
+            renderSingleHorizontalStaffline: true
+        });
+
+        await cacheViewer.render();
+
+        const html = cacheHost.innerHTML;
+        state.measureCache.set(index, html);
+        return html;
+    });
+
+    state.cacheRenderQueue = promise.catch(() => {});
+    state.measureCachePromises.set(index, promise);
+
+    try {
+        return await promise;
+    } finally {
+        state.measureCachePromises.delete(index);
+    }
+}
+
+async function showCachedMeasure(elementId, index) {
     if (index < 0 || index >= state.totalMeasures) {
         clearViewer(elementId);
         return;
     }
 
-    const number = osmdMeasureNumber(index);
-
-    viewer.setOptions({
-        drawFromMeasureNumber: number,
-        drawUpToMeasureNumber: number,
-        drawMeasureNumbers: false,
-        drawTitle: false,
-        drawSubtitle: false,
-        drawComposer: false,
-        drawLyricist: false,
-        drawCredits: false,
-        drawPartNames: false,
-        newSystemFromXML: false,
-        newPageFromXML: false,
-        pageFormat: "Endless",
-        renderSingleHorizontalStaffline: true
-    });
-
-    await viewer.render();
-
+    const html = await buildMeasureCache(index);
     const element = document.getElementById(elementId);
-    const svg = element.querySelector("svg");
 
-    if (svg) {
-        /*
-         * Todos los compases conservan la misma escala vertical.
-         * Antes se usaba width: 100%, por lo que un compás corto se
-         * agrandaba y uno denso se encogía. Ahora fijamos la altura
-         * musical y dejamos que el ancho sea proporcional.
-         */
-        const uniformHeight = 300;
+    element.innerHTML = html || "";
+    applyUniformSvgSize(element);
+}
 
-        svg.removeAttribute("width");
-        svg.removeAttribute("height");
-        svg.style.height = `${uniformHeight}px`;
-        svg.style.width = "auto";
-        svg.style.maxWidth = "none";
-        svg.style.maxHeight = "none";
-        svg.style.display = "block";
-        svg.style.flex = "0 0 auto";
-
-        const osmdPage = svg.parentElement;
-        if (osmdPage) {
-            osmdPage.style.width = "max-content";
-            osmdPage.style.minWidth = "100%";
-            osmdPage.style.display = "flex";
-            osmdPage.style.alignItems = "center";
-            osmdPage.style.justifyContent = "center";
-        }
-
-        element.scrollLeft = 0;
+function preloadMeasure(index) {
+    if (
+        index < 0 ||
+        index >= state.totalMeasures ||
+        state.measureCache.has(index) ||
+        state.measureCachePromises.has(index)
+    ) {
+        return;
     }
+
+    const schedule = window.requestIdleCallback
+        ? callback => window.requestIdleCallback(callback, { timeout: 800 })
+        : callback => window.setTimeout(callback, 30);
+
+    schedule(() => {
+        buildMeasureCache(index).catch(error => {
+            console.error("No se pudo precargar el compás:", error);
+        });
+    });
+}
+
+function preloadAround(index) {
+    preloadMeasure(index + 2);
+    preloadMeasure(index + 3);
 }
 
 async function renderWindow() {
@@ -283,12 +368,10 @@ async function renderWindow() {
     $("#nextBtn").disabled = current >= state.totalMeasures - 1;
 
     try {
-        await loadFullScoreInViewers();
-
         await Promise.all([
-            renderMeasure(viewers.past, "pastScore", current - 1),
-            renderMeasure(viewers.present, "presentScore", current),
-            renderMeasure(viewers.future, "futureScore", current + 1)
+            showCachedMeasure("pastScore", current - 1),
+            showCachedMeasure("presentScore", current),
+            showCachedMeasure("futureScore", current + 1)
         ]);
     } catch (error) {
         console.error("Error real de OSMD:", error);
@@ -299,7 +382,9 @@ async function renderWindow() {
     }
 
     if (token !== state.renderToken) return;
+
     state.measureDurationMs = durationForMeasure(current);
+    preloadAround(current);
 }
 
 
@@ -446,6 +531,7 @@ async function advanceAfterMeasure() {
 
 async function startCurrentMeasure() {
     cancelPlaybackTimer();
+    preloadAround(state.currentIndex);
     state.measureDurationMs = durationForMeasure(state.currentIndex);
     state.measureStartedAt = performance.now();
     $("#measureProgress").style.width = "0%";
@@ -568,6 +654,12 @@ async function loadScoreFromSource(source, displayName) {
                 viewer.clear();
             } catch (_) {}
         });
+
+        try {
+            cacheViewer.clear();
+        } catch (_) {}
+
+        cacheHost.innerHTML = "";
 
         $("#scoreTitle").textContent = displayName || "Partitura";
         $("#welcome").classList.add("hidden");
@@ -701,5 +793,9 @@ window.addEventListener("resize", () => {
     if (!state.xmlText) return;
 
     window.clearTimeout(window._scoreResizeTimer);
-    window._scoreResizeTimer = window.setTimeout(renderWindow, 250);
+    window._scoreResizeTimer = window.setTimeout(() => {
+        ["pastScore", "presentScore", "futureScore"].forEach(id => {
+            applyUniformSvgSize(document.getElementById(id));
+        });
+    }, 120);
 });
