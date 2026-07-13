@@ -147,9 +147,60 @@
 
     <section id="practiceArea" class="practice-area hidden">
         <div class="score-meta">
-            <strong id="scoreTitle">Partitura</strong>
+            <div class="score-title-group">
+                <strong id="scoreTitle">Partitura</strong>
+                <span id="tonalityBadge" class="tonality-badge">Tonalidad original</span>
+            </div>
             <span id="progressText">Compás 1 de 1</span>
         </div>
+
+        <section class="transpose-toolbar" aria-label="Herramientas de transposición">
+            <div class="transpose-field">
+                <label for="transposeSelect">Transponer</label>
+                <select id="transposeSelect">
+                    <option value="0">Original</option>
+                    <option value="-12">−12 semitonos · una octava abajo</option>
+                    <option value="-11">−11 semitonos</option>
+                    <option value="-10">−10 semitonos</option>
+                    <option value="-9">−9 semitonos</option>
+                    <option value="-8">−8 semitonos</option>
+                    <option value="-7">−7 semitonos</option>
+                    <option value="-6">−6 semitonos</option>
+                    <option value="-5">−5 semitonos</option>
+                    <option value="-4">−4 semitonos</option>
+                    <option value="-3">−3 semitonos</option>
+                    <option value="-2">−2 semitonos</option>
+                    <option value="-1">−1 semitono</option>
+                    <option value="1">+1 semitono</option>
+                    <option value="2">+2 semitonos</option>
+                    <option value="3">+3 semitonos</option>
+                    <option value="4">+4 semitonos</option>
+                    <option value="5">+5 semitonos</option>
+                    <option value="6">+6 semitonos</option>
+                    <option value="7">+7 semitonos</option>
+                    <option value="8">+8 semitonos</option>
+                    <option value="9">+9 semitonos</option>
+                    <option value="10">+10 semitonos</option>
+                    <option value="11">+11 semitonos</option>
+                    <option value="12">+12 semitonos · una octava arriba</option>
+                </select>
+            </div>
+
+            <div class="transpose-field">
+                <label for="spellingSelect">Escritura</label>
+                <select id="spellingSelect">
+                    <option value="auto">Automática</option>
+                    <option value="sharp">Preferir ♯</option>
+                    <option value="flat">Preferir ♭</option>
+                </select>
+            </div>
+
+            <button id="resetTransposeBtn" type="button">↺ Original</button>
+
+            <small class="transpose-help">
+                La partitura guardada no se modifica.
+            </small>
+        </section>
 
         <div class="measure-grid">
             <article class="measure-card past-card">

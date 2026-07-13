@@ -4,6 +4,11 @@ const $ = (selector) => document.querySelector(selector);
 
 const state = {
     xmlText: null,
+    originalXmlText: null,
+    originalScoreTitle: "",
+    transposeSemitones: 0,
+    spellingPreference: "auto",
+    originalKeyInfo: null,
     measureNumbers: [],
     currentIndex: 0,
     totalMeasures: 0,
@@ -118,6 +123,426 @@ async function readScoreFile(file) {
 
 function directChildrenByName(node, localName) {
     return [...node.children].filter(child => child.localName === localName);
+}
+
+
+const STEP_TO_PC = {
+    C: 0,
+    D: 2,
+    E: 4,
+    F: 5,
+    G: 7,
+    A: 9,
+    B: 11
+};
+
+const SHARP_SPELLINGS = [
+    { step: "C", alter: 0 },
+    { step: "C", alter: 1 },
+    { step: "D", alter: 0 },
+    { step: "D", alter: 1 },
+    { step: "E", alter: 0 },
+    { step: "F", alter: 0 },
+    { step: "F", alter: 1 },
+    { step: "G", alter: 0 },
+    { step: "G", alter: 1 },
+    { step: "A", alter: 0 },
+    { step: "A", alter: 1 },
+    { step: "B", alter: 0 }
+];
+
+const FLAT_SPELLINGS = [
+    { step: "C", alter: 0 },
+    { step: "D", alter: -1 },
+    { step: "D", alter: 0 },
+    { step: "E", alter: -1 },
+    { step: "E", alter: 0 },
+    { step: "F", alter: 0 },
+    { step: "G", alter: -1 },
+    { step: "G", alter: 0 },
+    { step: "A", alter: -1 },
+    { step: "A", alter: 0 },
+    { step: "B", alter: -1 },
+    { step: "B", alter: 0 }
+];
+
+const NOTE_NAMES_SHARP = [
+    "Do", "Do♯", "Re", "Re♯", "Mi", "Fa",
+    "Fa♯", "Sol", "Sol♯", "La", "La♯", "Si"
+];
+
+const NOTE_NAMES_FLAT = [
+    "Do", "Re♭", "Re", "Mi♭", "Mi", "Fa",
+    "Sol♭", "Sol", "La♭", "La", "Si♭", "Si"
+];
+
+const MAJOR_KEYS = {
+    "-7": 11, "-6": 6, "-5": 1, "-4": 8, "-3": 3,
+    "-2": 10, "-1": 5, "0": 0, "1": 7, "2": 2,
+    "3": 9, "4": 4, "5": 11, "6": 6, "7": 1
+};
+
+const MINOR_KEYS = {
+    "-7": 8, "-6": 3, "-5": 10, "-4": 5, "-3": 0,
+    "-2": 7, "-1": 2, "0": 9, "1": 4, "2": 11,
+    "3": 6, "4": 1, "5": 8, "6": 3, "7": 10
+};
+
+function normalizePitchClass(value) {
+    return ((value % 12) + 12) % 12;
+}
+
+function directChild(node, localName) {
+    return [...node.children].find(child => child.localName === localName)
+        || null;
+}
+
+function createMusicXmlElement(documentXml, localName) {
+    const namespace = documentXml.documentElement.namespaceURI;
+    return namespace
+        ? documentXml.createElementNS(namespace, localName)
+        : documentXml.createElement(localName);
+}
+
+function setOrCreateChildText(parent, localName, value, beforeNode = null) {
+    let child = directChild(parent, localName);
+
+    if (!child) {
+        child = createMusicXmlElement(parent.ownerDocument, localName);
+        if (beforeNode) {
+            parent.insertBefore(child, beforeNode);
+        } else {
+            parent.appendChild(child);
+        }
+    }
+
+    child.textContent = String(value);
+    return child;
+}
+
+function removeDirectChildren(parent, localName) {
+    directChildrenByName(parent, localName).forEach(child => child.remove());
+}
+
+function detectFirstKeyInfo(xmlText) {
+    const documentXml = new DOMParser().parseFromString(
+        xmlText,
+        "application/xml"
+    );
+    const key = [...documentXml.getElementsByTagName("*")]
+        .find(node => node.localName === "key");
+
+    if (!key) return null;
+
+    const fifthsNode = directChild(key, "fifths");
+    const modeNode = directChild(key, "mode");
+    const fifths = Number.parseInt(fifthsNode?.textContent || "0", 10);
+    const mode = (modeNode?.textContent || "major").trim().toLowerCase();
+
+    return {
+        fifths: Number.isFinite(fifths) ? fifths : 0,
+        mode: mode === "minor" ? "minor" : "major"
+    };
+}
+
+function keyTonicPitchClass(fifths, mode) {
+    const table = mode === "minor" ? MINOR_KEYS : MAJOR_KEYS;
+    return table[String(Math.max(-7, Math.min(7, fifths)))] ?? 0;
+}
+
+function selectTargetFifths(targetPc, mode, preference) {
+    const table = mode === "minor" ? MINOR_KEYS : MAJOR_KEYS;
+    const candidates = Object.entries(table)
+        .filter(([, pc]) => pc === targetPc)
+        .map(([fifths]) => Number(fifths));
+
+    if (!candidates.length) return 0;
+
+    if (preference === "sharp") {
+        return [...candidates].sort((a, b) => {
+            const aPenalty = a < 0 ? 20 : 0;
+            const bPenalty = b < 0 ? 20 : 0;
+            return (aPenalty + Math.abs(a)) - (bPenalty + Math.abs(b));
+        })[0];
+    }
+
+    if (preference === "flat") {
+        return [...candidates].sort((a, b) => {
+            const aPenalty = a > 0 ? 20 : 0;
+            const bPenalty = b > 0 ? 20 : 0;
+            return (aPenalty + Math.abs(a)) - (bPenalty + Math.abs(b));
+        })[0];
+    }
+
+    return [...candidates].sort((a, b) => Math.abs(a) - Math.abs(b))[0];
+}
+
+function effectiveSpellingPreference(preference, targetFifths = 0) {
+    if (preference === "sharp" || preference === "flat") {
+        return preference;
+    }
+
+    return targetFifths < 0 ? "flat" : "sharp";
+}
+
+function spellingForPitchClass(pc, preference) {
+    const table = preference === "flat"
+        ? FLAT_SPELLINGS
+        : SHARP_SPELLINGS;
+    return table[normalizePitchClass(pc)];
+}
+
+function transposePitchNode(pitch, semitones, preference) {
+    const stepNode = directChild(pitch, "step");
+    const alterNode = directChild(pitch, "alter");
+    const octaveNode = directChild(pitch, "octave");
+
+    if (!stepNode || !octaveNode) return;
+
+    const step = stepNode.textContent.trim().toUpperCase();
+    const alter = Number.parseInt(alterNode?.textContent || "0", 10) || 0;
+    const octave = Number.parseInt(octaveNode.textContent || "4", 10);
+
+    if (!(step in STEP_TO_PC) || !Number.isFinite(octave)) return;
+
+    const originalMidi =
+        (octave + 1) * 12 + STEP_TO_PC[step] + alter;
+    const targetMidi = originalMidi + semitones;
+    const targetPc = normalizePitchClass(targetMidi);
+    const targetOctave = Math.floor(targetMidi / 12) - 1;
+    const spelling = spellingForPitchClass(targetPc, preference);
+
+    stepNode.textContent = spelling.step;
+    octaveNode.textContent = String(targetOctave);
+
+    if (spelling.alter === 0) {
+        if (alterNode) alterNode.remove();
+    } else {
+        setOrCreateChildText(
+            pitch,
+            "alter",
+            spelling.alter,
+            octaveNode
+        );
+    }
+
+    const note = pitch.parentElement;
+    if (note?.localName === "note") {
+        removeDirectChildren(note, "accidental");
+    }
+}
+
+function transposeHarmonyPitch(container, stepName, alterName, semitones, preference) {
+    const stepNode = directChild(container, stepName);
+    if (!stepNode) return;
+
+    const alterNode = directChild(container, alterName);
+    const step = stepNode.textContent.trim().toUpperCase();
+    const alter = Number.parseInt(alterNode?.textContent || "0", 10) || 0;
+
+    if (!(step in STEP_TO_PC)) return;
+
+    const targetPc = normalizePitchClass(
+        STEP_TO_PC[step] + alter + semitones
+    );
+    const spelling = spellingForPitchClass(targetPc, preference);
+
+    stepNode.textContent = spelling.step;
+
+    if (spelling.alter === 0) {
+        if (alterNode) alterNode.remove();
+    } else {
+        setOrCreateChildText(
+            container,
+            alterName,
+            spelling.alter
+        );
+    }
+}
+
+function transposeMusicXml(xmlText, semitones, preference = "auto") {
+    if (!semitones) return xmlText;
+
+    const documentXml = new DOMParser().parseFromString(
+        xmlText,
+        "application/xml"
+    );
+
+    if (documentXml.querySelector("parsererror")) {
+        throw new Error("No fue posible interpretar la partitura para transponer.");
+    }
+
+    const keyNodes = [...documentXml.getElementsByTagName("*")]
+        .filter(node => node.localName === "key");
+
+    let firstTargetFifths = 0;
+
+    keyNodes.forEach((key, index) => {
+        const fifthsNode = directChild(key, "fifths");
+        if (!fifthsNode) return;
+
+        const modeNode = directChild(key, "mode");
+        const fifths = Number.parseInt(
+            fifthsNode.textContent || "0",
+            10
+        ) || 0;
+        const mode = (modeNode?.textContent || "major")
+            .trim()
+            .toLowerCase() === "minor"
+            ? "minor"
+            : "major";
+
+        const originalPc = keyTonicPitchClass(fifths, mode);
+        const targetPc = normalizePitchClass(originalPc + semitones);
+        const targetFifths = selectTargetFifths(
+            targetPc,
+            mode,
+            preference
+        );
+
+        fifthsNode.textContent = String(targetFifths);
+        if (index === 0) firstTargetFifths = targetFifths;
+    });
+
+    const spelling = effectiveSpellingPreference(
+        preference,
+        firstTargetFifths
+    );
+
+    [...documentXml.getElementsByTagName("*")]
+        .filter(node => node.localName === "pitch")
+        .forEach(pitch => {
+            transposePitchNode(pitch, semitones, spelling);
+        });
+
+    [...documentXml.getElementsByTagName("*")]
+        .filter(node => node.localName === "root")
+        .forEach(root => {
+            transposeHarmonyPitch(
+                root,
+                "root-step",
+                "root-alter",
+                semitones,
+                spelling
+            );
+        });
+
+    [...documentXml.getElementsByTagName("*")]
+        .filter(node => node.localName === "bass")
+        .forEach(bass => {
+            transposeHarmonyPitch(
+                bass,
+                "bass-step",
+                "bass-alter",
+                semitones,
+                spelling
+            );
+        });
+
+    return new XMLSerializer().serializeToString(documentXml);
+}
+
+function currentKeyDescription() {
+    if (!state.originalKeyInfo) {
+        if (!state.transposeSemitones) return "Tonalidad original";
+        const sign = state.transposeSemitones > 0 ? "+" : "";
+        return `${sign}${state.transposeSemitones} semitonos`;
+    }
+
+    const originalPc = keyTonicPitchClass(
+        state.originalKeyInfo.fifths,
+        state.originalKeyInfo.mode
+    );
+    const targetPc = normalizePitchClass(
+        originalPc + state.transposeSemitones
+    );
+
+    const preference = state.spellingPreference === "auto"
+        ? (
+            selectTargetFifths(
+                targetPc,
+                state.originalKeyInfo.mode,
+                "auto"
+            ) < 0
+                ? "flat"
+                : "sharp"
+        )
+        : state.spellingPreference;
+
+    const tonicName = preference === "flat"
+        ? NOTE_NAMES_FLAT[targetPc]
+        : NOTE_NAMES_SHARP[targetPc];
+
+    const modeName = state.originalKeyInfo.mode === "minor"
+        ? "menor"
+        : "mayor";
+
+    if (!state.transposeSemitones) {
+        return `${tonicName} ${modeName} · original`;
+    }
+
+    const sign = state.transposeSemitones > 0 ? "+" : "";
+    return `${tonicName} ${modeName} · ${sign}${state.transposeSemitones}`;
+}
+
+function resetRenderState() {
+    pause();
+
+    state.cacheViewerLoaded = false;
+    state.measureCache.clear();
+    state.measureCachePromises.clear();
+    state.cacheRenderQueue = Promise.resolve();
+
+    try {
+        cacheViewer.clear();
+    } catch (_) {}
+
+    cacheHost.innerHTML = "";
+
+    Object.values(viewers).forEach(viewer => {
+        try {
+            viewer.clear();
+        } catch (_) {}
+    });
+}
+
+async function applyTransposition() {
+    if (!state.originalXmlText) return;
+
+    const previousIndex = state.currentIndex;
+    resetRenderState();
+    showMessage("Aplicando transposición…", 1800);
+
+    try {
+        const transformedXml = transposeMusicXml(
+            state.originalXmlText,
+            state.transposeSemitones,
+            state.spellingPreference
+        );
+
+        parseScore(transformedXml);
+        state.currentIndex = Math.min(
+            previousIndex,
+            Math.max(0, state.totalMeasures - 1)
+        );
+
+        $("#tonalityBadge").textContent = currentKeyDescription();
+        $("#measureProgress").style.width = "0%";
+
+        await renderWindow();
+        showMessage(
+            state.transposeSemitones === 0
+                ? "Partitura restaurada a su tonalidad original."
+                : `Transposición aplicada: ${currentKeyDescription()}.`,
+            3200
+        );
+    } catch (error) {
+        console.error(error);
+        showMessage(
+            error?.message || "No fue posible transponer la partitura.",
+            8000
+        );
+    }
 }
 
 function parseScore(xmlText) {
@@ -647,6 +1072,16 @@ async function loadScoreFromSource(source, displayName) {
             xmlText = await readScoreFile(file);
         }
 
+        state.originalXmlText = xmlText;
+        state.originalScoreTitle = displayName || "Partitura";
+        state.transposeSemitones = 0;
+        state.spellingPreference = "auto";
+        state.originalKeyInfo = detectFirstKeyInfo(xmlText);
+
+        $("#transposeSelect").value = "0";
+        $("#spellingSelect").value = "auto";
+        $("#tonalityBadge").textContent = currentKeyDescription();
+
         parseScore(xmlText);
 
         Object.values(viewers).forEach(viewer => {
@@ -717,6 +1152,28 @@ $("#cancelUploadBtn").addEventListener(
     "click",
     () => $("#uploadDialog").close()
 );
+
+
+$("#transposeSelect").addEventListener("change", async event => {
+    state.transposeSemitones = Number(event.target.value) || 0;
+    await applyTransposition();
+});
+
+$("#spellingSelect").addEventListener("change", async event => {
+    state.spellingPreference = event.target.value || "auto";
+
+    if (state.transposeSemitones !== 0) {
+        await applyTransposition();
+    } else {
+        $("#tonalityBadge").textContent = currentKeyDescription();
+    }
+});
+
+$("#resetTransposeBtn").addEventListener("click", async () => {
+    $("#transposeSelect").value = "0";
+    state.transposeSemitones = 0;
+    await applyTransposition();
+});
 
 $("#playBtn").addEventListener("click", play);
 $("#firstBtn").addEventListener("click", () => goToMeasure(0));

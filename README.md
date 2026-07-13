@@ -55,3 +55,20 @@ Para respaldar toda la biblioteca, copie juntos:
 Esta versión guarda cada compás renderizado en una caché SVG y precarga los
 compases siguientes mientras se reproduce el actual. De esa manera, el
 metrónomo no tiene que esperar a OpenSheetMusicDisplay en cada transición.
+
+
+## Transposición
+
+El visor permite transponer temporalmente cada ejercicio entre −12 y +12
+semitonos. También permite escoger escritura automática, con sostenidos o con
+bemoles.
+
+La transposición:
+
+- modifica notas, octavas y armaduras dentro del navegador;
+- conserva ritmo, digitaciones, articulaciones y dinámicas;
+- actualiza símbolos de acordes básicos cuando existen;
+- no modifica el archivo original almacenado en la biblioteca.
+
+En ejercicios con digitación fija, la numeración se conserva aunque una nueva
+tonalidad pueda requerir otra solución técnica.

@@ -672,3 +672,98 @@ dialog::backdrop {
         grid-template-columns: 1fr;
     }
 }
+
+
+/* Herramientas de transposición */
+.score-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.tonality-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #e8eefc;
+    color: #244b9b;
+    font-size: .78rem;
+    font-weight: 900;
+}
+
+.transpose-toolbar {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    margin: 0 4px 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .92);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .05);
+}
+
+.transpose-field {
+    display: grid;
+    gap: 4px;
+}
+
+.transpose-field label {
+    color: var(--muted);
+    font-size: .74rem;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.transpose-field select {
+    min-height: 42px;
+    padding: 0 34px 0 11px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: white;
+    color: var(--ink);
+    font: inherit;
+    font-weight: 750;
+}
+
+.transpose-toolbar > button {
+    min-height: 42px;
+}
+
+.transpose-help {
+    margin-left: auto;
+    align-self: center;
+    color: var(--muted);
+    white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+    .transpose-toolbar {
+        align-items: stretch;
+        flex-wrap: wrap;
+    }
+
+    .transpose-field {
+        flex: 1 1 220px;
+    }
+
+    .transpose-field select {
+        width: 100%;
+    }
+
+    .transpose-help {
+        width: 100%;
+        margin-left: 0;
+        text-align: center;
+    }
+}
+
+@media (max-width: 560px) {
+    .transpose-toolbar > button {
+        width: 100%;
+    }
+}
