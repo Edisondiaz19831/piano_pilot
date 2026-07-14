@@ -767,3 +767,132 @@ dialog::backdrop {
         width: 100%;
     }
 }
+
+
+/* ================================================================
+   Lectura en tablet: conservar visible el inicio de cada compás
+   ================================================================ */
+
+.score-box {
+    justify-content: flex-start !important;
+    scroll-behavior: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.score-box > div {
+    justify-content: flex-start !important;
+    margin: 0 !important;
+}
+
+.score-box svg {
+    margin: 0 !important;
+    transform-origin: left center;
+}
+
+/* Distribución optimizada para tablet horizontal */
+@media (min-width: 721px) and (max-width: 1180px) {
+    .measure-grid {
+        grid-template-columns:
+            minmax(190px, .72fr)
+            minmax(430px, 1.62fr)
+            minmax(235px, .88fr);
+        gap: 10px;
+    }
+
+    .measure-card {
+        min-height: clamp(390px, 60vh, 650px);
+    }
+
+    .score-box {
+        min-width: 0;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    .score-box svg {
+        height: 285px !important;
+        width: auto !important;
+        max-width: none !important;
+    }
+
+    .past-card .score-box {
+        opacity: .46;
+    }
+
+    .future-card .score-box {
+        opacity: .82;
+    }
+}
+
+/* En modo vertical se evita comprimir tres tarjetas en una sola fila */
+@media (max-width: 820px) and (orientation: portrait) {
+    .measure-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .present-card {
+        order: 1;
+        min-height: 430px;
+    }
+
+    .future-card {
+        order: 2;
+        min-height: 300px;
+    }
+
+    .past-card {
+        order: 3;
+        min-height: 300px;
+    }
+
+    .score-box svg {
+        height: 260px !important;
+    }
+}
+
+.score-box::-webkit-scrollbar {
+    height: 8px;
+}
+
+.score-box::-webkit-scrollbar-track {
+    background: rgba(148, 163, 184, .18);
+    border-radius: 999px;
+}
+
+.score-box::-webkit-scrollbar-thumb {
+    background: rgba(71, 85, 105, .42);
+    border-radius: 999px;
+}
+
+
+/* El presente se adapta cuando un compás es demasiado ancho */
+.present-card .score-box {
+    overflow-x: hidden;
+    overflow-y: hidden;
+}
+
+.present-card .score-box > div {
+    width: 100% !important;
+    min-width: 100%;
+    justify-content: center;
+}
+
+@media (min-width: 721px) and (max-width: 1180px) {
+    .present-card .score-box svg {
+        height: auto;
+        min-height: 185px;
+    }
+}
+
+/*
+ * Pasado y futuro siguen permitiendo desplazamiento horizontal porque
+ * funcionan como referencia. El presente siempre intenta mostrar el compás
+ * completo.
+ */
+.past-card .score-box,
+.future-card .score-box {
+    overflow-x: auto;
+}

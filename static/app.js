@@ -664,30 +664,120 @@ function applyUniformSvgSize(element) {
     const svg = element.querySelector("svg");
     if (!svg) return;
 
-    const uniformHeight = 300;
+    const baseHeight = 300;
+    const isPresent = element.id === "presentScore";
 
     svg.removeAttribute("width");
     svg.removeAttribute("height");
-    svg.style.height = `${uniformHeight}px`;
     svg.style.width = "auto";
     svg.style.maxWidth = "none";
     svg.style.maxHeight = "none";
     svg.style.display = "block";
     svg.style.flex = "0 0 auto";
     svg.style.overflow = "visible";
+    svg.style.margin = "0";
+
+    /*
+     * En el panel PRESENTE intentamos conservar la altura normal.
+     * Si el compás es demasiado ancho para una tablet, calculamos una
+     * altura menor que permita verlo completo. Nunca se agranda por encima
+     * de la escala base.
+     */
+    let targetHeight = baseHeight;
+
+    const viewBox = svg.viewBox?.baseVal;
+    const intrinsicWidth = viewBox?.width || 0;
+    const intrinsicHeight = viewBox?.height || 0;
+
+    if (
+        isPresent &&
+        intrinsicWidth > 0 &&
+        intrinsicHeight > 0 &&
+        element.clientWidth > 0
+    ) {
+        const horizontalPadding = 44;
+        const availableWidth = Math.max(
+            180,
+            element.clientWidth - horizontalPadding
+        );
+
+        const fitHeight =
+            availableWidth * (intrinsicHeight / intrinsicWidth);
+
+        /*
+         * 205 px mantiene una lectura razonable incluso en tablet.
+         * Si un compás extremadamente ancho necesita más reducción,
+         * se permite bajar un poco más hasta 185 px.
+         */
+        const minimumReadableHeight =
+            window.innerWidth <= 1180 ? 185 : 215;
+
+        targetHeight = Math.min(
+            baseHeight,
+            Math.max(minimumReadableHeight, fitHeight)
+        );
+    }
+
+    svg.style.height = `${targetHeight}px`;
 
     const osmdPage = svg.parentElement;
     if (osmdPage) {
-        osmdPage.style.width = "max-content";
+        osmdPage.style.width = isPresent ? "100%" : "max-content";
         osmdPage.style.minWidth = "100%";
         osmdPage.style.display = "flex";
         osmdPage.style.alignItems = "center";
-        osmdPage.style.justifyContent = "center";
+        osmdPage.style.justifyContent =
+            isPresent && targetHeight < baseHeight
+                ? "center"
+                : "flex-start";
+        osmdPage.style.paddingLeft =
+            isPresent && targetHeight < baseHeight ? "10px" : "18px";
+        osmdPage.style.paddingRight = "24px";
+        osmdPage.style.boxSizing = "border-box";
+        osmdPage.style.overflow = "visible";
     }
 
     element.scrollLeft = 0;
-}
 
+    /*
+     * El navegador de la tablet puede recalcular el ancho del SVG después
+     * de insertarlo. Repetimos el ajuste en el siguiente frame para que el
+     * compás presente quede completamente visible.
+     */
+    requestAnimationFrame(() => {
+        if (
+            isPresent &&
+            intrinsicWidth > 0 &&
+            intrinsicHeight > 0 &&
+            element.clientWidth > 0
+        ) {
+            const availableWidth = Math.max(
+                180,
+                element.clientWidth - 44
+            );
+            const fitHeight =
+                availableWidth * (intrinsicHeight / intrinsicWidth);
+            const minimumReadableHeight =
+                window.innerWidth <= 1180 ? 185 : 215;
+
+            const finalHeight = Math.min(
+                baseHeight,
+                Math.max(minimumReadableHeight, fitHeight)
+            );
+
+            svg.style.height = `${finalHeight}px`;
+
+            if (osmdPage) {
+                osmdPage.style.justifyContent =
+                    finalHeight < baseHeight
+                        ? "center"
+                        : "flex-start";
+            }
+        }
+
+        element.scrollLeft = 0;
+    });
+}
 async function buildMeasureCache(index) {
     if (index < 0 || index >= state.totalMeasures) {
         return null;
@@ -752,6 +842,19 @@ async function showCachedMeasure(elementId, index) {
     applyUniformSvgSize(element);
 }
 
+
+function resetPanelScrollPositions() {
+    ["pastScore", "presentScore", "futureScore"].forEach(id => {
+        const panel = document.getElementById(id);
+        if (!panel) return;
+
+        panel.scrollLeft = 0;
+        requestAnimationFrame(() => {
+            panel.scrollLeft = 0;
+        });
+    });
+}
+
 function preloadMeasure(index) {
     if (
         index < 0 ||
@@ -808,6 +911,7 @@ async function renderWindow() {
 
     if (token !== state.renderToken) return;
 
+    resetPanelScrollPositions();
     state.measureDurationMs = durationForMeasure(current);
     preloadAround(current);
 }
@@ -1254,5 +1358,6 @@ window.addEventListener("resize", () => {
         ["pastScore", "presentScore", "futureScore"].forEach(id => {
             applyUniformSvgSize(document.getElementById(id));
         });
+        resetPanelScrollPositions();
     }, 120);
 });

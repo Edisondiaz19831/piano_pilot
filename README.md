@@ -72,3 +72,24 @@ La transposición:
 
 En ejercicios con digitación fija, la numeración se conserva aunque una nueva
 tonalidad pueda requerir otra solución técnica.
+
+
+## Ajuste para tablet
+
+Se conserva visible el comienzo de todos los compases, incluso cuando contienen
+muchas corcheas o son más anchos que la tarjeta:
+
+- alineación desde la izquierda;
+- margen antes de la llave y la primera nota;
+- retorno automático al inicio horizontal en cada transición;
+- presente más ancho en tablet horizontal;
+- disposición apilada en tablet vertical;
+- conservación de base de datos, biblioteca, metrónomo, caché y transposición.
+
+
+## Ajuste automático del compás presente
+
+El panel central conserva una altura de 300 px cuando el compás cabe. Si un
+compás es más ancho que el espacio disponible en una tablet, se reduce
+proporcionalmente hasta mostrarlo completo, sin deformar notas ni digitaciones.
+Los paneles pasado y futuro mantienen desplazamiento horizontal.
