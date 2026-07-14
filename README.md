@@ -93,3 +93,23 @@ El panel central conserva una altura de 300 px cuando el compás cabe. Si un
 compás es más ancho que el espacio disponible en una tablet, se reduce
 proporcionalmente hasta mostrarlo completo, sin deformar notas ni digitaciones.
 Los paneles pasado y futuro mantienen desplazamiento horizontal.
+
+
+## Encaje completo del compás
+
+Cada panel calcula ahora la escala del SVG usando simultáneamente el ancho y
+el alto disponibles. El compás se reduce proporcionalmente hasta caber
+completo, sin deformarse, sin barras horizontales y sin perder digitaciones.
+
+
+## Corrección de SVG sin viewBox
+
+Algunas partituras generadas por OpenSheetMusicDisplay no incluyen `viewBox`.
+La aplicación obtiene ahora el tamaño natural desde `viewBox`, atributos
+`width/height`, propiedades SVG o `getBBox`. Si ninguno está disponible,
+mantiene las dimensiones originales para impedir que la partitura desaparezca.
+
+
+## Corrección de caché
+
+Se restauraron `buildMeasureCache` y `showCachedMeasure`, y se añadió versionado de los archivos estáticos para evitar JavaScript antiguo en tablet o Render.

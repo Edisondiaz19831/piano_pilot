@@ -5,7 +5,7 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Biblioteca de práctica musical</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20260714b') }}">
 </head>
 <body>
 <header class="topbar">
@@ -202,6 +202,30 @@
             </small>
         </section>
 
+<!-- Dentro de #practiceArea, después de la sección transpose-toolbar -->
+<section class="loop-toolbar" aria-label="Herramientas de repetición">
+    <div class="loop-controls">
+        <div class="loop-field">
+            <label for="loopStart">Desde compás</label>
+            <input id="loopStart" type="number" min="1" value="1">
+        </div>
+        
+        <div class="loop-field">
+            <label for="loopEnd">Hasta compás</label>
+            <input id="loopEnd" type="number" min="1" value="3">
+        </div>
+        
+        <button id="setLoopBtn" type="button" class="loop-btn">🔁 Activar loop</button>
+        <button id="clearLoopBtn" type="button" class="loop-btn secondary">✕ Quitar loop</button>
+    </div>
+    
+    <div class="loop-status" id="loopStatus">
+        <span class="loop-badge" id="loopBadge">⏹ Loop desactivado</span>
+    </div>
+</section>
+
+
+
         <div class="measure-grid">
             <article class="measure-card past-card">
                 <div class="card-heading">
@@ -265,7 +289,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.7/build/opensheetmusicdisplay.min.js"></script>
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js', v='20260714b') }}"></script>
 
 {% if request.args.get('score_id') %}
 <script>

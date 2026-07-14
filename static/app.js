@@ -660,122 +660,105 @@ function clearViewer(elementId) {
     element.scrollLeft = 0;
 }
 
+function readSvgNaturalSize(svg) {
+    /*
+     * OSMD no siempre entrega viewBox. Intentamos, en orden:
+     * 1. viewBox
+     * 2. atributos width/height
+     * 3. propiedades SVG animadas
+     * 4. getBBox()
+     */
+    const viewBox = svg.viewBox?.baseVal;
+
+    if (viewBox?.width > 0 && viewBox?.height > 0) {
+        return {
+            width: viewBox.width,
+            height: viewBox.height
+        };
+    }
+
+    const parseSvgLength = value => {
+        if (!value) return 0;
+        const parsed = Number.parseFloat(String(value).replace(",", "."));
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const attributeWidth = parseSvgLength(svg.getAttribute("width"));
+    const attributeHeight = parseSvgLength(svg.getAttribute("height"));
+
+    if (attributeWidth > 0 && attributeHeight > 0) {
+        return {
+            width: attributeWidth,
+            height: attributeHeight
+        };
+    }
+
+    const baseWidth = svg.width?.baseVal?.value || 0;
+    const baseHeight = svg.height?.baseVal?.value || 0;
+
+    if (baseWidth > 0 && baseHeight > 0) {
+        return {
+            width: baseWidth,
+            height: baseHeight
+        };
+    }
+
+    try {
+        const box = svg.getBBox();
+        if (box.width > 0 && box.height > 0) {
+            return {
+                width: box.width,
+                height: box.height
+            };
+        }
+    } catch (_) {
+        // getBBox puede fallar durante el primer frame.
+    }
+
+    return null;
+}
+
+// Reemplaza la función applyUniformSvgSize con esta versión mejorada
 function applyUniformSvgSize(element) {
     const svg = element.querySelector("svg");
     if (!svg) return;
 
-    const baseHeight = 300;
-    const isPresent = element.id === "presentScore";
+    const container = svg.parentElement;
+    if (container) {
+        container.style.width = "100%";
+        container.style.height = "100%";
+        container.style.display = "flex";
+        container.style.alignItems = "center";
+        container.style.justifyContent = "center";
+        container.style.padding = "8px 6px 14px";
+        container.style.boxSizing = "border-box";
+        container.style.overflow = "visible";
+    }
 
+    // Eliminar atributos de tamaño fijo para que el CSS controle el escalado
     svg.removeAttribute("width");
     svg.removeAttribute("height");
-    svg.style.width = "auto";
-    svg.style.maxWidth = "none";
-    svg.style.maxHeight = "none";
+    
     svg.style.display = "block";
     svg.style.flex = "0 0 auto";
     svg.style.overflow = "visible";
-    svg.style.margin = "0";
+    svg.style.margin = "0 auto";
+    svg.style.maxWidth = "100%";
+    svg.style.maxHeight = "100%";
+    svg.style.width = "auto";
+    svg.style.height = "auto";
 
-    /*
-     * En el panel PRESENTE intentamos conservar la altura normal.
-     * Si el compás es demasiado ancho para una tablet, calculamos una
-     * altura menor que permita verlo completo. Nunca se agranda por encima
-     * de la escala base.
-     */
-    let targetHeight = baseHeight;
-
-    const viewBox = svg.viewBox?.baseVal;
-    const intrinsicWidth = viewBox?.width || 0;
-    const intrinsicHeight = viewBox?.height || 0;
-
-    if (
-        isPresent &&
-        intrinsicWidth > 0 &&
-        intrinsicHeight > 0 &&
-        element.clientWidth > 0
-    ) {
-        const horizontalPadding = 44;
-        const availableWidth = Math.max(
-            180,
-            element.clientWidth - horizontalPadding
-        );
-
-        const fitHeight =
-            availableWidth * (intrinsicHeight / intrinsicWidth);
-
-        /*
-         * 205 px mantiene una lectura razonable incluso en tablet.
-         * Si un compás extremadamente ancho necesita más reducción,
-         * se permite bajar un poco más hasta 185 px.
-         */
-        const minimumReadableHeight =
-            window.innerWidth <= 1180 ? 185 : 215;
-
-        targetHeight = Math.min(
-            baseHeight,
-            Math.max(minimumReadableHeight, fitHeight)
-        );
-    }
-
-    svg.style.height = `${targetHeight}px`;
-
-    const osmdPage = svg.parentElement;
-    if (osmdPage) {
-        osmdPage.style.width = isPresent ? "100%" : "max-content";
-        osmdPage.style.minWidth = "100%";
-        osmdPage.style.display = "flex";
-        osmdPage.style.alignItems = "center";
-        osmdPage.style.justifyContent =
-            isPresent && targetHeight < baseHeight
-                ? "center"
-                : "flex-start";
-        osmdPage.style.paddingLeft =
-            isPresent && targetHeight < baseHeight ? "10px" : "18px";
-        osmdPage.style.paddingRight = "24px";
-        osmdPage.style.boxSizing = "border-box";
-        osmdPage.style.overflow = "visible";
-    }
-
-    element.scrollLeft = 0;
-
-    /*
-     * El navegador de la tablet puede recalcular el ancho del SVG después
-     * de insertarlo. Repetimos el ajuste en el siguiente frame para que el
-     * compás presente quede completamente visible.
-     */
+    // Forzar redibujado después del render
     requestAnimationFrame(() => {
-        if (
-            isPresent &&
-            intrinsicWidth > 0 &&
-            intrinsicHeight > 0 &&
-            element.clientWidth > 0
-        ) {
-            const availableWidth = Math.max(
-                180,
-                element.clientWidth - 44
-            );
-            const fitHeight =
-                availableWidth * (intrinsicHeight / intrinsicWidth);
-            const minimumReadableHeight =
-                window.innerWidth <= 1180 ? 185 : 215;
-
-            const finalHeight = Math.min(
-                baseHeight,
-                Math.max(minimumReadableHeight, fitHeight)
-            );
-
-            svg.style.height = `${finalHeight}px`;
-
-            if (osmdPage) {
-                osmdPage.style.justifyContent =
-                    finalHeight < baseHeight
-                        ? "center"
-                        : "flex-start";
+        // Pequeño retraso para asegurar que el SVG ya está renderizado
+        setTimeout(() => {
+            // Asegurar que el SVG no se desborde
+            const rect = element.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                svg.style.maxWidth = `${Math.max(rect.width - 16, 100)}px`;
+                svg.style.maxHeight = `${Math.max(rect.height - 20, 100)}px`;
             }
-        }
-
-        element.scrollLeft = 0;
+        }, 50);
     });
 }
 async function buildMeasureCache(index) {
@@ -841,7 +824,6 @@ async function showCachedMeasure(elementId, index) {
     element.innerHTML = html || "";
     applyUniformSvgSize(element);
 }
-
 
 function resetPanelScrollPositions() {
     ["pastScore", "presentScore", "futureScore"].forEach(id => {
@@ -1240,6 +1222,305 @@ document.querySelectorAll(".score-select").forEach(button => {
         );
     });
 });
+
+// ============================================================
+//   LOOP DE COMPASES
+// ============================================================
+
+const loopState = {
+    active: false,
+    startIndex: 0,
+    endIndex: 2,
+    originalLoopEnd: 2
+};
+
+function updateLoopUI() {
+    const startInput = $("#loopStart");
+    const endInput = $("#loopEnd");
+    const statusBadge = $("#loopBadge");
+    const setBtn = $("#setLoopBtn");
+    
+    if (loopState.active) {
+        statusBadge.className = "loop-badge active";
+        statusBadge.innerHTML = `
+            🔁 Repitiendo compases 
+            <span class="loop-range">${loopState.startIndex + 1} → ${loopState.endIndex + 1}</span>
+        `;
+        setBtn.textContent = "⏹ Detener loop";
+        setBtn.classList.add("active");
+        
+        // Actualizar inputs para mostrar el rango activo
+        startInput.value = loopState.startIndex + 1;
+        endInput.value = loopState.endIndex + 1;
+    } else {
+        statusBadge.className = "loop-badge";
+        statusBadge.innerHTML = `⏹ Loop desactivado`;
+        setBtn.textContent = "🔁 Activar loop";
+        setBtn.classList.remove("active");
+    }
+}
+
+function validateLoopRange(start, end) {
+    if (start < 0 || end >= state.totalMeasures || start > end) {
+        return false;
+    }
+    return true;
+}
+
+function setLoop() {
+    const startInput = $("#loopStart");
+    const endInput = $("#loopEnd");
+    
+    let start = parseInt(startInput.value) - 1;
+    let end = parseInt(endInput.value) - 1;
+    
+    // Validar que sean números válidos
+    if (isNaN(start) || isNaN(end)) {
+        showMessage("Por favor, ingresa números de compás válidos.", 3000);
+        return;
+    }
+    
+    // Ajustar a índices 0-based
+    start = Math.max(0, start);
+    end = Math.min(state.totalMeasures - 1, end);
+    
+    if (!validateLoopRange(start, end)) {
+        showMessage(
+            `El rango debe ser entre 1 y ${state.totalMeasures}, y el inicio debe ser menor o igual al final.`,
+            4000
+        );
+        return;
+    }
+    
+    // Si el loop ya está activo con el mismo rango, lo desactivamos
+    if (loopState.active && 
+        loopState.startIndex === start && 
+        loopState.endIndex === end) {
+        clearLoop();
+        return;
+    }
+    
+    // Activar loop
+    loopState.active = true;
+    loopState.startIndex = start;
+    loopState.endIndex = end;
+    loopState.originalLoopEnd = end;
+    
+    // Si el compás actual está fuera del rango, ir al inicio del loop
+    if (state.currentIndex < start || state.currentIndex > end) {
+        state.currentIndex = start;
+        renderWindow();
+    }
+    
+    updateLoopUI();
+    showMessage(
+        `🔁 Loop activado: compases ${start + 1} → ${end + 1}.`,
+        2500
+    );
+}
+
+function clearLoop() {
+    loopState.active = false;
+    updateLoopUI();
+    showMessage("Loop desactivado.", 1500);
+}
+
+function toggleLoop() {
+    if (loopState.active) {
+        clearLoop();
+    } else {
+        setLoop();
+    }
+}
+
+function isInLoopRange(index) {
+    if (!loopState.active) return true;
+    return index >= loopState.startIndex && index <= loopState.endIndex;
+}
+
+function getNextLoopIndex(currentIndex) {
+    if (!loopState.active) return currentIndex + 1;
+    
+    if (currentIndex >= loopState.endIndex) {
+        return loopState.startIndex;
+    }
+    return currentIndex + 1;
+}
+
+// Sobrescribir advanceAfterMeasure para soportar loop
+const originalAdvanceAfterMeasure = advanceAfterMeasure;
+
+advanceAfterMeasure = async function() {
+    if (!state.playing) return;
+    
+    if (loopState.active) {
+        // Estamos en loop: si llegamos al final, volvemos al inicio
+        if (state.currentIndex >= loopState.endIndex) {
+            state.currentIndex = loopState.startIndex;
+            await renderWindow();
+            
+            // Reproducir desde el inicio del loop
+            cancelPlaybackTimer();
+            state.measureDurationMs = durationForMeasure(state.currentIndex);
+            state.measureStartedAt = performance.now();
+            $("#measureProgress").style.width = "0%";
+            updateProgress();
+            
+            try {
+                await scheduleMeasureMetronome(state.currentIndex);
+            } catch (error) {
+                console.error(error);
+            }
+            
+            state.timerId = window.setTimeout(
+                advanceAfterMeasure,
+                state.measureDurationMs
+            );
+            return;
+        }
+    }
+    
+    // Comportamiento normal: avanzar al siguiente compás
+    if (state.currentIndex >= state.totalMeasures - 1) {
+        if (loopState.active) {
+            // Si estamos en loop y llegamos al final de la partitura, 
+            // volvemos al inicio del loop (esto no debería pasar normalmente)
+            state.currentIndex = loopState.startIndex;
+            await renderWindow();
+            await startCurrentMeasure();
+        } else {
+            pause();
+            $("#measureProgress").style.width = "100%";
+            showMessage("Fin de la partitura.");
+        }
+        return;
+    }
+    
+    state.currentIndex += 1;
+    await renderWindow();
+    await startCurrentMeasure();
+};
+
+// Sobrescribir goToMeasure para respetar límites del loop
+const originalGoToMeasure = goToMeasure;
+
+goToMeasure = async function(index) {
+    pause();
+    
+    let targetIndex = Math.max(0, Math.min(state.totalMeasures - 1, index));
+    
+    // Si el loop está activo, limitar la navegación al rango del loop
+    if (loopState.active) {
+        if (targetIndex < loopState.startIndex) {
+            targetIndex = loopState.startIndex;
+        } else if (targetIndex > loopState.endIndex) {
+            targetIndex = loopState.endIndex;
+        }
+    }
+    
+    state.currentIndex = targetIndex;
+    $("#measureProgress").style.width = "0%";
+    await renderWindow();
+};
+
+// Event listeners para loop
+$("#setLoopBtn").addEventListener("click", toggleLoop);
+$("#clearLoopBtn").addEventListener("click", clearLoop);
+
+// Validar inputs de loop cuando cambian
+$("#loopStart").addEventListener("change", function() {
+    const maxVal = state.totalMeasures || 1;
+    let val = parseInt(this.value) || 1;
+    val = Math.max(1, Math.min(maxVal, val));
+    this.value = val;
+    
+    // Si el inicio es mayor que el final, ajustar automáticamente
+    const endVal = parseInt($("#loopEnd").value) || 1;
+    if (val > endVal) {
+        $("#loopEnd").value = Math.min(val, maxVal);
+    }
+});
+
+$("#loopEnd").addEventListener("change", function() {
+    const maxVal = state.totalMeasures || 1;
+    let val = parseInt(this.value) || 1;
+    val = Math.max(1, Math.min(maxVal, val));
+    this.value = val;
+    
+    // Si el final es menor que el inicio, ajustar automáticamente
+    const startVal = parseInt($("#loopStart").value) || 1;
+    if (val < startVal) {
+        $("#loopStart").value = Math.max(1, val);
+    }
+});
+
+// Actualizar límites de inputs cuando se carga una partitura
+function updateLoopLimits() {
+    const maxVal = state.totalMeasures || 1;
+    $("#loopStart").max = maxVal;
+    $("#loopEnd").max = maxVal;
+    $("#loopEnd").value = Math.min(3, maxVal);
+    $("#loopStart").value = 1;
+    
+    // Si el loop estaba activo, desactivarlo al cargar nueva partitura
+    if (loopState.active) {
+        loopState.active = false;
+        updateLoopUI();
+    }
+}
+
+// Modificar loadScoreFromSource para actualizar límites
+// Agregar esta línea al final de la función loadScoreFromSource, 
+// después de parseScore pero antes de renderWindow:
+
+// Dentro de loadScoreFromSource, después de parseScore(xmlText):
+// updateLoopLimits();
+
+// Para no reescribir toda la función, podemos extenderla:
+const originalLoadScore = loadScoreFromSource;
+
+loadScoreFromSource = async function(source, displayName) {
+    await originalLoadScore(source, displayName);
+    // Después de cargar, actualizar límites del loop
+    if (state.totalMeasures > 0) {
+        updateLoopLimits();
+    }
+};
+
+// También actualizar cuando se renderiza la ventana
+const originalRenderWindow = renderWindow;
+
+renderWindow = async function() {
+    await originalRenderWindow();
+    
+    // Actualizar progreso si estamos en loop
+    if (loopState.active) {
+        const startInput = $("#loopStart");
+        const endInput = $("#loopEnd");
+        startInput.value = loopState.startIndex + 1;
+        endInput.value = loopState.endIndex + 1;
+        updateLoopUI();
+    }
+};
+
+// Inicializar UI del loop
+updateLoopUI();
+
+// Teclas rápidas para loop
+window.addEventListener("keydown", function(event) {
+    if (!state.xmlText) return;
+    
+    // L para activar/desactivar loop
+    if (event.key === "l" || event.key === "L") {
+        if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+            event.preventDefault();
+            toggleLoop();
+        }
+    }
+});
+
+
+
 
 $("#libraryBtn").addEventListener("click", openLibrary);
 $("#welcomeLibraryBtn").addEventListener("click", openLibrary);

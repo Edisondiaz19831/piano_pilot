@@ -163,15 +163,29 @@ main {
 .score-box {
     height: calc(100% - 48px);
     overflow: hidden;
-    padding: 10px 4px;
+    padding: 8px 4px;
     display: flex;
     align-items: center;
+    justify-content: center;
 }
 
-.score-box > div,
-.score-box svg {
+.score-box > div {
     width: 100% !important;
-    max-width: 100%;
+    height: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 1px;
+}
+
+.score-box svg {
+    width: auto !important;
+    height: auto !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    flex: 0 0 auto;
+    display: block;
+    overflow: visible;
 }
 
 .score-box:empty::after {
@@ -285,154 +299,150 @@ main {
     text-align: center;
 }
 
-@media (max-width: 1000px) {
-    :root { --controls-height: 164px; }
+/* ============================================================
+   OPTIMIZACIÓN PARA TABLET - COMPASES COMPLETOS
+   ============================================================ */
 
-    .controls {
-        grid-template-columns: auto 1fr;
-    }
-
-    .control-options {
-        grid-column: 1 / -1;
-        justify-content: center;
-    }
-
+/* Tablet horizontal - los tres compases visibles */
+@media (min-width: 821px) and (max-width: 1200px) {
+    :root { --controls-height: 130px; }
+    
     .measure-grid {
-        grid-template-columns: .72fr 1.5fr .72fr;
+        grid-template-columns: minmax(180px, .7fr) minmax(350px, 1.6fr) minmax(200px, .7fr);
+        gap: 10px;
     }
-}
-
-@media (max-width: 720px) {
-    :root { --controls-height: 210px; }
-
-    .topbar {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .file-button { width: 100%; }
-
-    .measure-grid {
-        grid-template-columns: 1fr;
-    }
-
+    
     .measure-card {
-        min-height: 250px;
+        min-height: clamp(380px, 58vh, 620px);
     }
-
-    .past-card, .future-card {
-        min-height: 190px;
-    }
-
-    .present-card { order: -1; }
-
-    .controls {
-        grid-template-columns: 1fr;
-        gap: 9px;
-    }
-
-    .transport { justify-content: center; }
-    .control-options { grid-column: auto; }
-}
-
-
-/* Ajuste del render SVG de OSMD */
-.score-box {
-    justify-content: center;
-    overflow: auto;
-}
-
-.score-box svg {
-    margin: auto;
-    overflow: visible;
-}
-
-.score-box canvas {
-    max-width: 100%;
-    height: auto !important;
-}
-
-
-/* Escala musical uniforme para todos los compases */
-.score-box {
-    height: calc(100% - 48px);
-    min-height: 330px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    align-items: center;
-    justify-content: flex-start;
-    scrollbar-width: thin;
-    scrollbar-gutter: stable;
-}
-
-.score-box > div {
-    width: max-content !important;
-    min-width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.score-box svg {
-    flex: 0 0 auto;
-    height: 300px !important;
-    width: auto !important;
-    max-width: none !important;
-    max-height: none !important;
-    margin: auto;
-    overflow: visible;
-}
-
-/*
- * La digitación suele quedar por encima o debajo del pentagrama.
- * Este espacio evita que se corte en los bordes superior e inferior.
- */
-.measure-card {
-    padding-bottom: 12px;
-}
-
-@media (max-width: 1000px) {
-    .score-box svg {
-        height: 270px !important;
-    }
-
+    
     .score-box {
+        padding: 6px 2px;
         min-height: 300px;
     }
-}
-
-@media (max-width: 720px) {
+    
     .score-box svg {
-        height: 235px !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
     }
+    
+    /* Pasado y Futuro más pequeños pero legibles */
+    .past-card .score-box svg,
+    .future-card .score-box svg {
+        max-height: 85% !important;
+    }
+    
+    /* Presente ocupa más espacio */
+    .present-card .score-box svg {
+        max-height: 95% !important;
+    }
+}
 
+/* Tablet vertical - una sola columna */
+@media (max-width: 820px) and (orientation: portrait) {
+    :root { --controls-height: 200px; }
+    
+    .measure-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .present-card {
+        order: -1;
+        min-height: 420px;
+    }
+    
+    .past-card,
+    .future-card {
+        min-height: 280px;
+    }
+    
     .score-box {
-        min-height: 265px;
+        min-height: 250px;
+        padding: 8px 4px;
+    }
+    
+    .score-box svg {
+        max-width: 100% !important;
+        max-height: 100% !important;
+    }
+    
+    .past-card .score-box svg,
+    .future-card .score-box svg {
+        max-height: 90% !important;
+    }
+    
+    .present-card .score-box svg {
+        max-height: 95% !important;
     }
 }
 
-
-/* Control discreto para el volumen del metrónomo */
-.volume-control {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.volume-control input[type="range"] {
-    width: 92px;
-    min-width: 72px;
-}
-
-@media (max-width: 1000px) {
-    .volume-control input[type="range"] {
-        width: 120px;
+/* Tablet pequeña / móvil grande */
+@media (max-width: 820px) and (orientation: landscape) {
+    :root { --controls-height: 140px; }
+    
+    .measure-grid {
+        grid-template-columns: minmax(160px, .65fr) minmax(300px, 1.7fr) minmax(160px, .65fr);
+        gap: 8px;
+    }
+    
+    .measure-card {
+        min-height: clamp(300px, 52vh, 480px);
+    }
+    
+    .score-box {
+        min-height: 240px;
+        padding: 4px 2px;
+    }
+    
+    .score-box svg {
+        max-width: 100% !important;
+        max-height: 100% !important;
     }
 }
 
+/* Móvil vertical */
+@media (max-width: 480px) and (orientation: portrait) {
+    :root { --controls-height: 220px; }
+    
+    .measure-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    
+    .present-card {
+        min-height: 340px;
+    }
+    
+    .past-card,
+    .future-card {
+        min-height: 220px;
+    }
+    
+    .score-box {
+        min-height: 180px;
+        padding: 4px 2px;
+    }
+    
+    .score-box svg {
+        max-width: 100% !important;
+        max-height: 100% !important;
+    }
+}
 
-/* Biblioteca y formularios */
+/* Ocultar scrollbars */
+.score-box::-webkit-scrollbar {
+    display: none;
+}
+
+.score-box {
+    scrollbar-width: none;
+}
+
+/* ============================================================
+   BIBLIOTECA Y FORMULARIOS
+   ============================================================ */
+
 .header-actions {
     display: flex;
     gap: 10px;
@@ -673,8 +683,10 @@ dialog::backdrop {
     }
 }
 
+/* ============================================================
+   HERRAMIENTAS DE TRANSPOSICIÓN
+   ============================================================ */
 
-/* Herramientas de transposición */
 .score-title-group {
     display: flex;
     align-items: center;
@@ -704,6 +716,7 @@ dialog::backdrop {
     border-radius: 14px;
     background: rgba(255, 255, 255, .92);
     box-shadow: 0 4px 14px rgba(15, 23, 42, .05);
+    flex-wrap: wrap;
 }
 
 .transpose-field {
@@ -744,11 +757,10 @@ dialog::backdrop {
 @media (max-width: 900px) {
     .transpose-toolbar {
         align-items: stretch;
-        flex-wrap: wrap;
     }
 
     .transpose-field {
-        flex: 1 1 220px;
+        flex: 1 1 200px;
     }
 
     .transpose-field select {
@@ -768,131 +780,187 @@ dialog::backdrop {
     }
 }
 
-
-/* ================================================================
-   Lectura en tablet: conservar visible el inicio de cada compás
-   ================================================================ */
-
-.score-box {
-    justify-content: flex-start !important;
-    scroll-behavior: auto;
-    overscroll-behavior-x: contain;
-    -webkit-overflow-scrolling: touch;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+.volume-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.score-box > div {
-    justify-content: flex-start !important;
-    margin: 0 !important;
+.volume-control input[type="range"] {
+    width: 92px;
+    min-width: 72px;
 }
 
-.score-box svg {
-    margin: 0 !important;
-    transform-origin: left center;
-}
-
-/* Distribución optimizada para tablet horizontal */
-@media (min-width: 721px) and (max-width: 1180px) {
-    .measure-grid {
-        grid-template-columns:
-            minmax(190px, .72fr)
-            minmax(430px, 1.62fr)
-            minmax(235px, .88fr);
-        gap: 10px;
-    }
-
-    .measure-card {
-        min-height: clamp(390px, 60vh, 650px);
-    }
-
-    .score-box {
-        min-width: 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-    }
-
-    .score-box svg {
-        height: 285px !important;
-        width: auto !important;
-        max-width: none !important;
-    }
-
-    .past-card .score-box {
-        opacity: .46;
-    }
-
-    .future-card .score-box {
-        opacity: .82;
+@media (max-width: 1000px) {
+    .volume-control input[type="range"] {
+        width: 120px;
     }
 }
 
-/* En modo vertical se evita comprimir tres tarjetas en una sola fila */
-@media (max-width: 820px) and (orientation: portrait) {
-    .measure-grid {
-        grid-template-columns: 1fr;
-    }
+/* ============================================================
+   LOOP DE COMPASES - NUEVA FUNCIONALIDAD
+   ============================================================ */
 
-    .present-card {
-        order: 1;
-        min-height: 430px;
-    }
-
-    .future-card {
-        order: 2;
-        min-height: 300px;
-    }
-
-    .past-card {
-        order: 3;
-        min-height: 300px;
-    }
-
-    .score-box svg {
-        height: 260px !important;
-    }
+.loop-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 4px 12px;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .92);
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .05);
+    flex-wrap: wrap;
 }
 
-.score-box::-webkit-scrollbar {
-    height: 8px;
+.loop-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex: 1;
 }
 
-.score-box::-webkit-scrollbar-track {
-    background: rgba(148, 163, 184, .18);
+.loop-field {
+    display: grid;
+    gap: 3px;
+}
+
+.loop-field label {
+    color: var(--muted);
+    font-size: .7rem;
+    font-weight: 900;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.loop-field input {
+    width: 70px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font: inherit;
+    font-weight: 700;
+    text-align: center;
+}
+
+.loop-field input:focus {
+    outline: 2px solid var(--present);
+    outline-offset: 2px;
+}
+
+.loop-btn {
+    min-width: 44px;
+    min-height: 38px;
+    padding: 0 16px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: .9rem;
+}
+
+.loop-btn.loop-btn {
+    background: var(--present);
+    color: white;
+    border-color: var(--present);
+}
+
+.loop-btn.loop-btn:hover {
+    background: #1a44b5;
+}
+
+.loop-btn.secondary {
+    background: #f1f3f5;
+    color: var(--ink);
+    border-color: var(--border);
+}
+
+.loop-btn.secondary:hover {
+    background: #e5e8eb;
+}
+
+.loop-btn.active {
+    background: #e74c3c;
+    border-color: #e74c3c;
+    color: white;
+}
+
+.loop-btn.active:hover {
+    background: #c0392b;
+}
+
+.loop-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.loop-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 14px;
     border-radius: 999px;
+    font-size: .82rem;
+    font-weight: 800;
+    background: #f1f3f5;
+    color: var(--muted);
 }
 
-.score-box::-webkit-scrollbar-thumb {
-    background: rgba(71, 85, 105, .42);
-    border-radius: 999px;
+.loop-badge.active {
+    background: #fde8e8;
+    color: #c0392b;
 }
 
-
-/* El presente se adapta cuando un compás es demasiado ancho */
-.present-card .score-box {
-    overflow-x: hidden;
-    overflow-y: hidden;
+.loop-badge .loop-range {
+    font-weight: 900;
+    color: #e74c3c;
 }
 
-.present-card .score-box > div {
-    width: 100% !important;
-    min-width: 100%;
-    justify-content: center;
+.loop-error {
+    color: #e74c3c;
+    font-size: .8rem;
+    font-weight: 700;
 }
 
-@media (min-width: 721px) and (max-width: 1180px) {
-    .present-card .score-box svg {
-        height: auto;
-        min-height: 185px;
+@media (max-width: 720px) {
+    .loop-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .loop-controls {
+        justify-content: center;
+    }
+    
+    .loop-field input {
+        width: 60px;
+    }
+    
+    .loop-status {
+        justify-content: center;
     }
 }
 
-/*
- * Pasado y futuro siguen permitiendo desplazamiento horizontal porque
- * funcionan como referencia. El presente siempre intenta mostrar el compás
- * completo.
- */
-.past-card .score-box,
-.future-card .score-box {
-    overflow-x: auto;
+@media (max-width: 480px) {
+    .loop-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .loop-field {
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 6px;
+    }
+    
+    .loop-field input {
+        width: 100%;
+    }
+    
+    .loop-btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
