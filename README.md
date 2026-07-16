@@ -113,3 +113,24 @@ mantiene las dimensiones originales para impedir que la partitura desaparezca.
 ## Corrección de caché
 
 Se restauraron `buildMeasureCache` y `showCachedMeasure`, y se añadió versionado de los archivos estáticos para evitar JavaScript antiguo en tablet o Render.
+
+
+## Guía con nombres de notas
+
+La barra de transposición incluye la opción **Mostrar nombres de notas**.
+
+- Muestra nombres en español: Do, Re, Mi, Fa, Sol, La y Si.
+- Respeta sostenidos, bemoles y alteraciones dobles.
+- En acordes combina las alturas en una sola guía, por ejemplo Do–Mi–Sol.
+- Al transponer, los nombres se recalculan con las nuevas alturas.
+- Las etiquetas son temporales y no modifican el archivo guardado.
+
+
+## Cifrado de notas
+
+La guía utiliza cifrado anglosajón:
+
+- C, D, E, F, G, A y B.
+- Las alteraciones se muestran como C♯, E♭, F𝄪, etc.
+- Los acordes se muestran combinados, por ejemplo C–E–G.
+- El cifrado se recalcula automáticamente al transponer.

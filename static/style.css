@@ -964,3 +964,40 @@ dialog::backdrop {
         justify-content: center;
     }
 }
+
+/* Opción de guía con nombres de notas */
+.note-guide-toggle {
+    min-height: 42px;
+    display: inline-flex !important;
+    grid-template-columns: none !important;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #f8fafc;
+    color: var(--ink);
+    font-size: .88rem;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.note-guide-toggle input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    accent-color: var(--present);
+}
+
+@media (max-width: 900px) {
+    .note-guide-toggle {
+        flex: 1 1 230px;
+        justify-content: center;
+    }
+}
+
+/*
+ * Los nombres se insertan como letras de MusicXML. OSMD reserva su espacio
+ * dentro del SVG, por lo que permanecen vinculados a las notas al transponer.
+ */

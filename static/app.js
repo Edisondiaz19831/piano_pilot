@@ -9,6 +9,7 @@ const state = {
     transposeSemitones: 0,
     spellingPreference: "auto",
     originalKeyInfo: null,
+    showNoteNames: false,
     measureNumbers: [],
     currentIndex: 0,
     totalMeasures: 0,
@@ -360,6 +361,157 @@ function transposeHarmonyPitch(container, stepName, alterName, semitones, prefer
     }
 }
 
+
+const NOTE_LETTER_NAMES = {
+    C: "C",
+    D: "D",
+    E: "E",
+    F: "F",
+    G: "G",
+    A: "A",
+    B: "B"
+};
+
+function accidentalText(alter) {
+    if (alter === 2) return "𝄪";
+    if (alter === 1) return "♯";
+    if (alter === -1) return "♭";
+    if (alter === -2) return "𝄫";
+    if (alter > 2) return "♯".repeat(alter);
+    if (alter < -2) return "♭".repeat(Math.abs(alter));
+    return "";
+}
+
+function spanishNameFromPitch(pitch) {
+    const stepNode = directChild(pitch, "step");
+    const alterNode = directChild(pitch, "alter");
+
+    if (!stepNode) return "";
+
+    const step = stepNode.textContent.trim().toUpperCase();
+    const alter = Number.parseInt(alterNode?.textContent || "0", 10) || 0;
+
+    return `${NOTE_LETTER_NAMES[step] || step}${accidentalText(alter)}`;
+}
+
+function removeGeneratedNoteGuides(documentXml) {
+    [...documentXml.getElementsByTagName("*")]
+        .filter(node =>
+            node.localName === "lyric" &&
+            node.getAttribute("number") === "99" &&
+            node.getAttribute("name") === "Cifrado de notas"
+        )
+        .forEach(node => node.remove());
+}
+
+function addGuideLyric(note, label) {
+    if (!label) return;
+
+    const documentXml = note.ownerDocument;
+    const lyric = createMusicXmlElement(documentXml, "lyric");
+    lyric.setAttribute("number", "99");
+    lyric.setAttribute("name", "Cifrado de notas");
+    lyric.setAttribute("placement", "below");
+
+    const syllabic = createMusicXmlElement(documentXml, "syllabic");
+    syllabic.textContent = "single";
+
+    const text = createMusicXmlElement(documentXml, "text");
+    text.textContent = label;
+
+    lyric.appendChild(syllabic);
+    lyric.appendChild(text);
+    note.appendChild(lyric);
+}
+
+function addNoteNameGuides(xmlText) {
+    const documentXml = new DOMParser().parseFromString(
+        xmlText,
+        "application/xml"
+    );
+
+    if (documentXml.querySelector("parsererror")) {
+        throw new Error(
+            "No fue posible interpretar la partitura para mostrar el cifrado."
+        );
+    }
+
+    removeGeneratedNoteGuides(documentXml);
+
+    /*
+     * En MusicXML, un acorde se representa con una nota inicial seguida
+     * por notas que contienen <chord/>. Creamos una sola etiqueta
+     * combinada, por ejemplo: Do–Mi–Sol, para evitar superposiciones.
+     */
+    const measures = [...documentXml.getElementsByTagName("*")]
+        .filter(node => node.localName === "measure");
+
+    measures.forEach(measure => {
+        const notes = directChildrenByName(measure, "note");
+        let chordAnchor = null;
+        let chordNames = [];
+
+        const flushChord = () => {
+            if (chordAnchor && chordNames.length) {
+                addGuideLyric(chordAnchor, chordNames.join("–"));
+            }
+            chordAnchor = null;
+            chordNames = [];
+        };
+
+        notes.forEach(note => {
+            const isRest = Boolean(directChild(note, "rest"));
+            const pitch = directChild(note, "pitch");
+            const isChordContinuation = Boolean(directChild(note, "chord"));
+            const isGrace = Boolean(directChild(note, "grace"));
+
+            if (isRest || !pitch) {
+                if (!isChordContinuation) flushChord();
+                return;
+            }
+
+            const name = spanishNameFromPitch(pitch);
+
+            if (isChordContinuation && chordAnchor) {
+                chordNames.push(name);
+                return;
+            }
+
+            flushChord();
+            chordAnchor = note;
+            chordNames = [name];
+
+            /*
+             * Las notas de adorno también reciben guía, pero forman su
+             * propio grupo para no mezclarse con la nota principal.
+             */
+            if (isGrace) {
+                flushChord();
+            }
+        });
+
+        flushChord();
+    });
+
+    return new XMLSerializer().serializeToString(documentXml);
+}
+
+function buildDisplayedMusicXml() {
+    if (!state.originalXmlText) return null;
+
+    let xmlText = transposeMusicXml(
+        state.originalXmlText,
+        state.transposeSemitones,
+        state.spellingPreference
+    );
+
+    if (state.showNoteNames) {
+        xmlText = addNoteNameGuides(xmlText);
+    }
+
+    return xmlText;
+}
+
 function transposeMusicXml(xmlText, semitones, preference = "auto") {
     if (!semitones) return xmlText;
 
@@ -514,11 +666,7 @@ async function applyTransposition() {
     showMessage("Aplicando transposición…", 1800);
 
     try {
-        const transformedXml = transposeMusicXml(
-            state.originalXmlText,
-            state.transposeSemitones,
-            state.spellingPreference
-        );
+        const transformedXml = buildDisplayedMusicXml();
 
         parseScore(transformedXml);
         state.currentIndex = Math.min(
@@ -530,10 +678,14 @@ async function applyTransposition() {
         $("#measureProgress").style.width = "0%";
 
         await renderWindow();
+        const guideText = state.showNoteNames
+            ? " · cifrado de notas visible"
+            : "";
+
         showMessage(
             state.transposeSemitones === 0
-                ? "Partitura restaurada a su tonalidad original."
-                : `Transposición aplicada: ${currentKeyDescription()}.`,
+                ? `Tonalidad original${guideText}.`
+                : `Transposición aplicada: ${currentKeyDescription()}${guideText}.`,
             3200
         );
     } catch (error) {
@@ -1162,13 +1314,15 @@ async function loadScoreFromSource(source, displayName) {
         state.originalScoreTitle = displayName || "Partitura";
         state.transposeSemitones = 0;
         state.spellingPreference = "auto";
+        state.showNoteNames = false;
         state.originalKeyInfo = detectFirstKeyInfo(xmlText);
 
         $("#transposeSelect").value = "0";
         $("#spellingSelect").value = "auto";
+        $("#showNoteNamesToggle").checked = false;
         $("#tonalityBadge").textContent = currentKeyDescription();
 
-        parseScore(xmlText);
+        parseScore(buildDisplayedMusicXml());
 
         Object.values(viewers).forEach(viewer => {
             try {
@@ -1538,6 +1692,15 @@ $("#cancelUploadBtn").addEventListener(
     () => $("#uploadDialog").close()
 );
 
+
+
+$("#showNoteNamesToggle").addEventListener("change", async event => {
+    state.showNoteNames = Boolean(event.target.checked);
+
+    if (!state.originalXmlText) return;
+
+    await applyTransposition();
+});
 
 $("#transposeSelect").addEventListener("change", async event => {
     state.transposeSemitones = Number(event.target.value) || 0;

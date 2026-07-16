@@ -5,7 +5,7 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Biblioteca de práctica musical</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20260714b') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css', v='20260715-cifrado1') }}">
 </head>
 <body>
 <header class="topbar">
@@ -197,6 +197,11 @@
 
             <button id="resetTransposeBtn" type="button">↺ Original</button>
 
+            <label class="note-guide-toggle">
+                <input id="showNoteNamesToggle" type="checkbox">
+                <span>Mostrar cifrado de notas</span>
+            </label>
+
             <small class="transpose-help">
                 La partitura guardada no se modifica.
             </small>
@@ -289,7 +294,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.7/build/opensheetmusicdisplay.min.js"></script>
-<script src="{{ url_for('static', filename='app.js', v='20260714b') }}"></script>
+<script src="{{ url_for('static', filename='app.js', v='20260715-cifrado1') }}"></script>
 
 {% if request.args.get('score_id') %}
 <script>
